@@ -1,0 +1,181 @@
+# =====================
+# openHacker v1.0.0 - Dockerfile
+# Multi-stage build for Alpine Linux
+# =====================
+
+# =====================
+# Stage 1: Builder
+# =====================
+FROM python:3.11-alpine AS builder
+
+LABEL maintainer="Ian Carter Kulani <ian@openhacker.io>"
+LABEL description="openHacker - Cyber Command & Control Platform"
+LABEL version="1.0.0"
+
+# Install build dependencies
+RUN apk add --no-cache \
+    gcc \
+    g++ \
+    make \
+    musl-dev \
+    libffi-dev \
+    openssl-dev \
+    python3-dev \
+    linux-headers \
+    cargo \
+    rust \
+    git \
+    curl
+
+# Set working directory
+WORKDIR /build
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+
+# Create virtual environment and install dependencies
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -r requirements.txt
+
+# =====================
+# Stage 2: Runtime
+# =====================
+FROM python:3.11-alpine
+
+LABEL maintainer="Ian Carter Kulani <ian@openhacker.io>"
+LABEL description="openHacker - Cyber Command & Control Platform"
+LABEL version="1.0.0"
+
+# Install runtime dependencies (security tools included)
+RUN apk add --no-cache \
+    # Networking tools
+    iputils \
+    traceroute \
+    nmap \
+    nmap-scripts \
+    netcat-openbsd \
+    curl \
+    wget \
+    bind-tools \
+    whois \
+    tcpdump \
+    mtr \
+    fping \
+    arping \
+    # System tools
+    bash \
+    sudo \
+    iproute2 \
+    iptables \
+    ip6tables \
+    net-tools \
+    procps \
+    htop \
+    iftop \
+    nethogs \
+    # Development tools
+    git \
+    openssh-client \
+    openssh-keygen \
+    # Utilities
+    ca-certificates \
+    tzdata \
+    # Python
+    python3 \
+    py3-pip \
+    # Libraries
+    libffi \
+    openssl \
+    libstdc++ \
+    # Additional security tools
+    nikto \
+    hydra \
+    john \
+    sqlmap
+
+# Create openhacker user
+RUN addgroup -g 1000 openhacker && \
+    adduser -u 1000 -G openhacker -s /bin/bash -D openhacker
+
+# Create app directory
+WORKDIR /app
+
+# Copy virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Copy application files
+COPY openhacker.py .
+COPY requirements.txt .
+COPY requirements-check.py .
+COPY README.md* ./
+
+# Create necessary directories
+RUN mkdir -p /app/.openhacker \
+    /app/.openhacker/payloads \
+    /app/.openhacker/workspaces \
+    /app/.openhacker/scans \
+    /app/openhacker_reports \
+    /app/.openhacker/phishing_pages \
+    /app/.openhacker/captured_credentials \
+    /app/.openhacker/ssh_keys \
+    /app/.openhacker/traffic_logs \
+    /app/.openhacker/nikto_results \
+    /app/.openhacker/graphics \
+    /app/temp \
+    /app/.openhacker/web_templates \
+    /app/.openhacker/sessions \
+    /app/.openhacker/spear_phishing \
+    /app/.openhacker/email_templates \
+    /app/.openhacker/dos_logs \
+    /app/.openhacker/agents \
+    /app/.openhacker/c2_logs \
+    /app/.openhacker/modules \
+    /app/.openhacker/network_monitor \
+    /app/.openhacker/keylog_exfil \
+    /app/.openhacker/deployments \
+    /app/.openhacker/domain_hosting \
+    /app/.openhacker/cracking \
+    /app/.openhacker/arp_logs \
+    /app/.openhacker/mac_logs \
+    /app/.openhacker/nat_logs \
+    /app/.openhacker/platform_logs \
+    /app/.openhacker/docker_scans \
+    /app/.openhacker/email_composer \
+    /app/openhacker_reports/pdf_reports \
+    /app/.openhacker/threat_monitor
+
+# Set permissions
+RUN chown -R openhacker:openhacker /app
+
+# Switch to non-root user
+USER openhacker
+
+# Environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    OPENHACKER_HOME=/app/.openhacker \
+    OPENHACKER_CONFIG=/app/.openhacker/config.json
+
+# Expose ports
+EXPOSE 5000 8080 4444 5555
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python3 -c "import requests; requests.get('http://localhost:5000/api/stats', timeout=5)" || exit 1
+
+# Default command
+ENTRYPOINT ["python3", "openhacker.py"]
+CMD ["--help"]
+
+# =====================
+# Metadata
+# =====================
+# Build: docker build -t openhacker:1.0.0 .
+# Run:   docker run -it --rm --name openhacker \
+#        -p 5000:5000 -p 8080:8080 \
+#        --cap-add=NET_ADMIN --cap-add=NET_RAW \
+#        openhacker:1.0.0
