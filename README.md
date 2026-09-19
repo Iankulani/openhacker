@@ -31,10 +31,12 @@ System Requirements
 Python 3.7+
 ```
 
+
+
 # Linux, macOS, or Windows (WSL recommended)
-
+```bash
 Root/sudo privileges for full functionality
-
+```
 Required Tools
 
 
@@ -43,3 +45,4 @@ Required Tools
 # References
 
 # Star History
+
