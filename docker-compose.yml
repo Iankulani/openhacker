@@ -1,0 +1,174 @@
+# =====================
+# openHacker v1.0.0 - Docker Compose
+# =====================
+
+version: '3.8'
+
+services:
+  # Main openHacker application
+  openhacker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: openhacker:1.0.0
+    container_name: openhacker
+    hostname: openhacker
+    restart: unless-stopped
+    
+    # Environment variables
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - OPENHACKER_HOME=/app/.openhacker
+      - OPENHACKER_CONFIG=/app/.openhacker/config.json
+      - TZ=UTC
+    
+    # Ports
+    ports:
+      - "5000:5000"   # Web Dashboard
+      - "8080:8080"   # Phishing Server
+      - "4444:4444"   # C2 Server
+      - "5555:5555"   # Agent Communication
+    
+    # Volumes for persistent data
+    volumes:
+      - openhacker_data:/app/.openhacker
+      - openhacker_reports:/app/openhacker_reports
+      - openhacker_temp:/app/temp
+      - ./config:/app/config:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    
+    # Network capabilities for security tools
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - NET_BIND_SERVICE
+      - SYS_ADMIN
+    
+    # Network mode
+    network_mode: bridge
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 1G
+    
+    # Security options
+    security_opt:
+      - no-new-privileges:false
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import requests; requests.get('http://localhost:5000/api/stats', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    
+    # Logging
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # TTY for interactive mode
+    tty: true
+    stdin_open: true
+    
+    # Command
+    command: ["--interactive"]
+
+  # Optional: Redis for caching (if needed)
+  redis:
+    image: redis:7-alpine
+    container_name: openhacker-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Optional: PostgreSQL for enhanced database (if needed)
+  postgres:
+    image: postgres:16-alpine
+    container_name: openhacker-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=openhacker
+      - POSTGRES_PASSWORD=openhacker_secure_2024
+      - POSTGRES_DB=openhacker
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openhacker"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Optional: Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: openhacker-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - openhacker
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# =====================
+# Volumes
+# =====================
+volumes:
+  openhacker_data:
+    driver: local
+    name: openhacker_data
+  openhacker_reports:
+    driver: local
+    name: openhacker_reports
+  openhacker_temp:
+    driver: local
+    name: openhacker_temp
+  redis_data:
+    driver: local
+    name: openhacker_redis_data
+  postgres_data:
+    driver: local
+    name: openhacker_postgres_data
+  nginx_logs:
+    driver: local
+    name: openhacker_nginx_logs
+
+# =====================
+# Networks
+# =====================
+networks:
+  default:
+    name: openhacker_network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
