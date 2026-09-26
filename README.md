@@ -46,3 +46,4 @@ Required Tools
 
 # Star History
 
+[![Star History Chart](https://api.star-history.com/svg?repos=Iankulani/openhacker&type=Date)](https://star-history.com/#Iankulani/openhacker&Date)
