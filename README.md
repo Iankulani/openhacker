@@ -2,9 +2,6 @@
 
 <div align="center">
 
-</div>
-
-
 [![GitHub stars](https://img.shields.io/github/stars/Iankulani/openhacker?style=for-the-badge&logo=github)](https://github.com/Iankulani/openhacker/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/Iankulani/openhacker?style=for-the-badge&logo=github)](https://github.com/Iankulani/openhacker/network)
 [![GitHub watchers](https://img.shields.io/github/watchers/Iankulani/openhacker?style=for-the-badge&logo=github)](https://github.com/Iankulani/openhacker/watchers)
